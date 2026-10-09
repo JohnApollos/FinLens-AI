@@ -26,6 +26,8 @@ backend/data/shap_waterfall.png
 backend/data/ratio_comparison.png
 backend/data/history.json
 backend/data/temp/
+backend/data/logs/
+*.log
 .pytest_cache/
 
 # User document folders (exclude files, keep folders)

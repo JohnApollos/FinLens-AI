@@ -100,6 +100,7 @@ def health_check():
     
     return {
         "status": "healthy",
+        "version": "1.0.0",
         "timestamp": time.time(),
         "model_loaded": model_exists,
         "benchmarks_loaded": benchmarks_exist,
@@ -208,7 +209,10 @@ async def analyze_document(
                 "interest_expense": extracted.get("interest_expense", 0.0),
                 "working_capital": extracted["working_capital"],
                 "cash": extracted["cash"],
-                "retained_earnings": extracted["retained_earnings"]
+                "retained_earnings": extracted["retained_earnings"],
+                "borrowings": extracted.get("borrowings", 0.0),
+                "capital_adequacy_ratio": extracted.get("capital_adequacy_ratio", 0.0),
+                "solvency_ratio": extracted.get("solvency_ratio", 0.0)
             },
             "analysis": analysis,
             "narrative": narrative,
@@ -320,9 +324,12 @@ async def generate_report(
                 "expenses": result["metrics"]["expenses"],
                 "net_income": result["metrics"]["net_income"],
                 "interest_expense": result["metrics"]["interest_expense"],
-                "working_capital": result["metrics"]["working_capital"],
-                "cash": result["metrics"]["cash"],
-                "retained_earnings": result["metrics"]["retained_earnings"]
+                "working_capital": result["metrics"].get("working_capital", 0.0),
+                "cash": result["metrics"].get("cash", 0.0),
+                "retained_earnings": result["metrics"].get("retained_earnings", 0.0),
+                "borrowings": result["metrics"].get("borrowings", 0.0),
+                "capital_adequacy_ratio": result["metrics"].get("capital_adequacy_ratio", 0.0),
+                "solvency_ratio": result["metrics"].get("solvency_ratio", 0.0)
             }
             
             # Map anomaly chart path temporarily back to the local file for the PDF builder

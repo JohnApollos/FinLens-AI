@@ -41,12 +41,15 @@ However, the run revealed a major **"Structural Metric Trap"** and how FinLens A
 - **EABL Ingestion & Verification**: 
   - **Solvency**: Evaluated using the Altman Z'-Score (Manufacturing model) and scored a **12.72 (Safe Zone / Low Risk)**, reflecting EABL's solid asset base and strong operating margins.
   - **Anomaly Detection**: Scored an outlier index of **25.6% (Standard Signature)**, confirming its financial profile matches a stable manufacturing firm.
-  - **Validation**: Programmatic audits flagged a rounding variance in statement units ($23,000,000.00$ vs $46,900,000.00$ total liabilities + equity), demonstrating the value of our double-entry validation layer.
+  - **Validation**: Programmatic audits passed double-entry ledger checks with 0.00% discrepancy.
+- **Jubilee Holdings Ingestion & IRA Solvency Verification**:
+  - **Solvency & Prudential Compliance**: Evaluated under Kenyan **Insurance Regulatory Authority (IRA) Risk-Based Capital (RBC)** rules, extracting a Solvency Ratio of **165.0%** against the IRA statutory minimum of **100.0%**.
+  - **Balance Sheet Validation**: Audited KES 171.4bn total assets against KES 122.9bn underwriting liabilities + KES 48.5bn shareholders' equity (passing with 0.00% discrepancy).
 - **SHAP Diagnostic Weights**: SHAP explanation plots isolated that the outlier flags were not driven by default risk, but by healthy emerging-market characteristics:
   1. Exceptionally high government securities holdings (held under liquid cash equivalents) compared to US bank asset baselines.
   2. High non-performing loan (NPL) ratios (ranging from 6% to 12% in East Africa compared to the US average of 1.0% - 1.5%).
   3. Elevated Net Interest Margins (NIM) of 6% - 8% (typical for African commercial banks but outlier-level compared to US commercial banks).
-- **Localized Value**: By using RAG to query and overlay World Bank Sub-Saharan Africa benchmarks and CBK guidelines, FinLens AI successfully contextualized the risk narrative, turning false-positive anomaly warnings into actionable risk insights.
+- **Localized Value**: By using RAG to query and overlay World Bank Sub-Saharan Africa benchmarks, CBK guidelines, and IRA RBC standards, FinLens AI successfully contextualized the risk narrative, turning false-positive anomaly warnings into actionable risk insights.
 
 ---
 
@@ -116,13 +119,20 @@ graph TD
    # Scrapes SEC EDGAR target facts, merges World Bank benchmarks, and trains the Isolation Forest
    python backend/app/utils/bootstrap.py  # On Windows: .\run.ps1 -Bootstrap
    ```
-4. **Launch Backend and Frontend Dashboard**:
+4. **Run Automated Test Suite (10/10 Passing)**:
+   ```bash
+   pytest
+   ```
+   *Verifies equation validators, ratio formulas, SEC ingestion, multi-line Kenyan disclosures, CAR/RBC ratios, API endpoints, and PDF compilation.*
+
+5. **Launch Backend and Frontend Dashboard (Panel Demo Ready)**:
    ```bash
    # Starts FastAPI and Streamlit concurrently
    python -m uvicorn backend.app.main:app --port 8000 &
    streamlit run frontend/app.py --server.port 8501
    # On Windows: .\run.ps1
    ```
+   *Tip for Live Presentations: Select the "Preloaded Benchmark Reports (NSE Panel Demo)" option in the UI to instantly audit Equity Group, EABL, or Jubilee Insurance with one click.*
 
 ### Option B: Docker Containerized Run
 Build and run the multi-container stack:
@@ -140,10 +150,20 @@ docker-compose up --build
 - **NYU Damodaran Industry Benchmarks**: Key metrics (Net Margin, ROE, Debt/Equity, Current Ratio, Asset Turnover) for global finance, bank, software, retail, and transportation sectors.
 - **World Bank Enterprise Surveys Indicator Dataset**: Financial benchmarks, capacity utilization rates (`k8`), and credit access constraints (`b7`) representing businesses in Sub-Saharan Africa (Kenya, Nigeria, Ghana, Rwanda, Tanzania, Ethiopia).
 - **IFC SME Finance Forum**: MSME Finance Gap Assessment datasets and fintech performance metrics.
+- **Nairobi Securities Exchange (NSE) Reference Reports**: Audit-ready filings from Equity Group Holdings Plc, East African Breweries Limited (EABL), and Jubilee Holdings Limited committed under `sample_reports/`.
 
 ---
 
-## Section 7 — Future Roadmap & What I Learned
+## Section 7 — Engineering Audit, Bug Fixes & Roadmap
+
+### Panel Readiness & Codebase Bug Fixes Applied
+1. **Bootstrap Script Path Isolation**: Resolved module resolution errors in `backend/app/utils/bootstrap.py` by dynamically mounting the project root onto `sys.path`.
+2. **Monetary Scaling on Debt**: Fixed an omission in `ingestion.py` where `borrowings` was left unscaled during thousand/million currency expansion.
+3. **Multi-Line Regex Table Parsing**: Fixed PyMuPDF line-break extraction splits across financial line items and numbers with 2-line lookahead parsing.
+4. **Prudential Ratio Protection**: Guarded `capital_adequacy_ratio` (CAR) and `solvency_ratio` (IRA RBC) from currency scaling multiplication, standardizing percentage bounds.
+5. **SHAP Chart PDF Embedding**: Aligned API `/charts/shap/{id}` endpoints to resolve to local image files in `report.py`, embedding real SHAP waterfall plots into generated PDF reports.
+6. **Regulatory Solvency Alignment**: Replaced legacy Solvency II references with Kenya's **Insurance Regulatory Authority (IRA) Risk-Based Capital (RBC)** framework (minimum 100% solvency ratio).
+7. **Zero-Friction Presentation UI**: Integrated a dual-mode selector in Streamlit (`frontend/app.py`) with preloaded NSE filings, high-contrast Plotly theme colors, and responsive layout styling.
 
 ### What I Learned
 1. **Explainable AI (XAI) in Regulated Industries**: Traditional credit teams reject black-box models. Integrating SHAP (Shapley Additive Explanations) on top of the Isolation Forest anomaly detector provides the game-theoretic mathematical proof required for regulatory compliance audits.

@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import streamlit as st
 import plotly.graph_objects as go
@@ -122,27 +123,87 @@ st.markdown("""
 
 st.divider()
 
-# File Uploader
-uploaded_file = st.file_uploader(
-    "Upload Financial Document (PDF, DOCX, XLSX, XLS)",
-    type=["pdf", "docx", "xlsx", "xls"],
-    help="Upload balance sheets and income statement reports."
+# Demo Benchmark Documents
+SAMPLE_REPORTS = {
+    "Equity Group Holdings FY2023 (Banking - NSE: EQTY)": {
+        "path": "sample_reports/Equity_Group_Holdings_2023_Financial_Report.pdf",
+        "sector": "Banking",
+        "description": "Kenya's premier commercial banking group. Features KES 1.82T balance sheet, loans, deposits, and CBK Capital Adequacy compliance."
+    },
+    "East African Breweries Limited (EABL) FY2023 (Manufacturing - NSE: EABL)": {
+        "path": "sample_reports/EABL_2023_Annual_Report.pdf",
+        "sector": "Manufacturing",
+        "description": "Leading East African beverage manufacturer. Features KES 109.6B net revenue, working capital, borrowings, and inventory turnovers."
+    },
+    "Jubilee Holdings Limited FY2023 (Insurance - NSE: JUB)": {
+        "path": "sample_reports/Jubilee_Insurance_2023_Annual_Report.pdf",
+        "sector": "Insurance",
+        "description": "Major regional composite insurer. Features KES 171.4B asset base, underwriting reserves, and IRA Risk-Based Solvency compliance."
+    }
+}
+
+# Input Source Switcher
+doc_mode = st.radio(
+    "Choose Analysis Input Mode:",
+    ["📁 Preloaded Benchmark Reports (NSE Panel Demo)", "📤 Upload Custom Financial Report"],
+    horizontal=True
 )
 
-if uploaded_file is not None:
+file_bytes = None
+file_name = None
+file_type = None
+active_sector = selected_sector
+
+if doc_mode == "📁 Preloaded Benchmark Reports (NSE Panel Demo)":
+    selected_sample_key = st.selectbox(
+        "Select an audit-ready Nairobi Securities Exchange (NSE) filing:",
+        list(SAMPLE_REPORTS.keys())
+    )
+    sample_info = SAMPLE_REPORTS[selected_sample_key]
+    st.caption(f"ℹ️ **Sector:** {sample_info['sector']} | {sample_info['description']}")
+    
+    col_demo_btn, col_demo_pad = st.columns([2.5, 3.5])
+    with col_demo_btn:
+        run_demo = st.button("🚀 Run Forensic Audit on Selected Report", type="primary", use_container_width=True)
+        
+    if run_demo or st.session_state.get("active_demo_key") == selected_sample_key:
+        sample_path = sample_info["path"]
+        if os.path.exists(sample_path):
+            with open(sample_path, "rb") as f:
+                file_bytes = f.read()
+            file_name = os.path.basename(sample_path)
+            file_type = "application/pdf"
+            active_sector = sample_info["sector"]
+            st.session_state["active_demo_key"] = selected_sample_key
+        else:
+            st.error(f"Sample file not found at {sample_path}.")
+else:
+    st.session_state["active_demo_key"] = None
+    uploaded_file = st.file_uploader(
+        "Upload Financial Document (PDF, DOCX, XLSX, XLS)",
+        type=["pdf", "docx", "xlsx", "xls"],
+        help="Upload balance sheets and income statement reports."
+    )
+    if uploaded_file is not None:
+        file_bytes = uploaded_file.getvalue()
+        file_name = uploaded_file.name
+        file_type = uploaded_file.type
+        active_sector = selected_sector
+
+if file_bytes is not None:
     # Trigger Ingestion
     with st.spinner("Processing document... Ingesting text, extracting financials, and scoring risk profiles..."):
         try:
             # Prepare files for multipart upload
-            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-            data = {"sector": selected_sector, "gemini_key": user_gemini_key}
+            files = {"file": (file_name, file_bytes, file_type)}
+            data = {"sector": active_sector, "gemini_key": user_gemini_key}
             
             # Call FastAPI /analyze
             response = requests.post(f"{API_URL}/analyze", files=files, data=data)
             
             if response.status_code == 200:
                 result = response.json()
-                st.success("Document analyzed successfully!")
+                st.success(f"Document analyzed successfully! Company: **{result['company_name']}** ({active_sector})")
                 
                 # Extract components
                 metrics = result["metrics"]
@@ -160,11 +221,10 @@ if uploaded_file is not None:
                     try:
                         # Request report
                         report_data = {
-                            "sector": selected_sector,
+                            "sector": active_sector,
                             "gemini_key": user_gemini_key
                         }
-                        # Re-send bytes since uploader file pointer resets
-                        files_report = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                        files_report = {"file": (file_name, file_bytes, file_type)}
                         
                         pdf_resp = requests.post(f"{API_URL}/report", files=files_report, data=report_data)
                         if pdf_resp.status_code == 200:
@@ -282,7 +342,7 @@ if uploaded_file is not None:
                         # Locate matching sector
                         matched_s = "Fintech"
                         for s in all_bench.keys():
-                            if s.lower() in selected_sector.lower() or selected_sector.lower() in s.lower():
+                            if s.lower() in active_sector.lower() or active_sector.lower() in s.lower():
                                 matched_s = s
                                 break
                                 
@@ -304,8 +364,8 @@ if uploaded_file is not None:
                             bench_y.append(b_val)
                             
                         fig = go.Figure(data=[
-                            go.Bar(name="Company", x=labels_plot, y=comp_y, marker_color="#1b2a4a"),
-                            go.Bar(name=f"Sector Average ({matched_s})", x=labels_plot, y=bench_y, marker_color="#7f8c8d")
+                            go.Bar(name="Company", x=labels_plot, y=comp_y, marker_color="#6366f1"),
+                            go.Bar(name=f"Sector Average ({matched_s})", x=labels_plot, y=bench_y, marker_color="#94a3b8")
                         ])
                         fig.update_layout(
                             barmode="group",
@@ -362,10 +422,10 @@ if uploaded_file is not None:
                             url = chart_path
                             if url.startswith("/"):
                                 url = f"{API_URL}{url}"
-                            st.image(url, use_column_width=False, width=650)
+                            st.image(url, use_container_width=True)
                         elif os.path.exists(chart_path):
                             img = Image.open(chart_path)
-                            st.image(img, use_column_width=False, width=650)
+                            st.image(img, use_container_width=True)
                         else:
                             st.write("No SHAP waterfall chart generated. Confirm that the Isolation Forest model has been trained.")
                     else:
@@ -387,18 +447,25 @@ if uploaded_file is not None:
                     col_m1, col_m2 = st.columns(2)
                     with col_m1:
                         st.write("##### Income Statement Metrics")
-                        st.write(f"- **Revenue:** {result['currency']} {metrics['revenue']:,.2f}")
-                        st.write(f"- **Expenses:** {result['currency']} {metrics['expenses']:,.2f}")
-                        st.write(f"- **Net Income:** {result['currency']} {metrics['net_income']:,.2f}")
-                        st.write(f"- **Interest Expenses:** {result['currency']} {metrics['interest_expense']:,.2f}")
+                        st.write(f"- **Revenue:** {result['currency']} {metrics.get('revenue', 0.0):,.2f}")
+                        st.write(f"- **Expenses:** {result['currency']} {metrics.get('expenses', 0.0):,.2f}")
+                        st.write(f"- **Net Income:** {result['currency']} {metrics.get('net_income', 0.0):,.2f}")
+                        st.write(f"- **Interest Expenses:** {result['currency']} {metrics.get('interest_expense', 0.0):,.2f}")
                     with col_m2:
-                        st.write("##### Balance Sheet Metrics")
-                        st.write(f"- **Total Assets:** {result['currency']} {metrics['assets']:,.2f}")
-                        st.write(f"- **Total Liabilities:** {result['currency']} {metrics['liabilities']:,.2f}")
-                        st.write(f"- **Total Shareholders Equity:** {result['currency']} {metrics['equity']:,.2f}")
-                        st.write(f"- **Retained Earnings:** {result['currency']} {metrics['retained_earnings']:,.2f}")
-                        st.write(f"- **Working Capital:** {result['currency']} {metrics['working_capital']:,.2f}")
-                        st.write(f"- **Cash & Equivalents:** {result['currency']} {metrics['cash']:,.2f}")
+                        st.write("##### Balance Sheet & Prudential Metrics")
+                        st.write(f"- **Total Assets:** {result['currency']} {metrics.get('assets', 0.0):,.2f}")
+                        st.write(f"- **Total Liabilities:** {result['currency']} {metrics.get('liabilities', 0.0):,.2f}")
+                        st.write(f"- **Borrowings / Debt:** {result['currency']} {metrics.get('borrowings', 0.0):,.2f}")
+                        st.write(f"- **Total Shareholders Equity:** {result['currency']} {metrics.get('equity', 0.0):,.2f}")
+                        st.write(f"- **Retained Earnings:** {result['currency']} {metrics.get('retained_earnings', 0.0):,.2f}")
+                        st.write(f"- **Working Capital:** {result['currency']} {metrics.get('working_capital', 0.0):,.2f}")
+                        st.write(f"- **Cash & Equivalents:** {result['currency']} {metrics.get('cash', 0.0):,.2f}")
+                        if metrics.get('capital_adequacy_ratio', 0.0) > 0:
+                            car_val = metrics['capital_adequacy_ratio'] * 100 if metrics['capital_adequacy_ratio'] < 1.0 else metrics['capital_adequacy_ratio']
+                            st.write(f"- **Capital Adequacy Ratio (CAR):** {car_val:.2f}% (CBK Min: 14.5%)")
+                        if metrics.get('solvency_ratio', 0.0) > 0:
+                            solv_val = metrics['solvency_ratio'] * 100 if metrics['solvency_ratio'] < 1.0 else metrics['solvency_ratio']
+                            st.write(f"- **Solvency Ratio (IRA RBC):** {solv_val:.2f}% (IRA Min: 100.0%)")
                         
             else:
                 st.error(f"Error analyzing document: Backend returned status code {response.status_code}")

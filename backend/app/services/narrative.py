@@ -22,14 +22,16 @@ REGULATORY_DOCUMENTS = [
         "metadata": {"sector": "Banking", "topic": "Capital Adequacy & NPLs"}
     },
     {
-        "id": "insurance_solvency_2",
+        "id": "insurance_ira_kenya",
         "document": (
-            "Solvency II Insurance Regulation Standards:\n"
-            "- Insurance companies must maintain a Solvency Capital Requirement (SCR) ratio of at least 100%.\n"
-            "- Premium receivables represent high credit risk if not collected within 90 days. Net premium margins must exceed 5.0% for sustainable underwriting.\n"
-            "- Debt-to-Equity ratios must remain conservative (typically <0.30) to protect policyholder reserves, as debt servicing cannot be funded from restricted policyholder assets."
+            "Insurance Regulatory Authority (IRA) Kenya Risk-Based Capital (RBC) Framework:\n"
+            "- Insurance companies are regulated under the Insurance Act and the IRA Risk-Based Capital framework (not European Solvency II).\n"
+            "- Insurers must maintain a Capital Adequacy / Solvency Ratio (Available Capital to Required Capital) of at least 100%, with regulatory supervisory thresholds.\n"
+            "- Crucially, policyholder insurance contract liabilities (IFRS 17 reserves) are obligations to policyholders backed by matching liquid investment portfolios (government securities and deposits), NOT commercial borrowings.\n"
+            "- Commercial borrowings (financial debt) should be evaluated separately from policyholder reserves. An insurer with zero interest-bearing borrowings carries zero commercial leverage default risk.\n"
+            "- Underwriting sustainability requires positive insurance service margins and admitted asset coverage."
         ),
-        "metadata": {"sector": "Insurance", "topic": "SCR & Underwriting Reserves"}
+        "metadata": {"sector": "Insurance", "topic": "IRA Risk-Based Capital & Technical Reserves"}
     },
     {
         "id": "fintech_emerging_markets",
@@ -382,8 +384,18 @@ def generate_risk_narrative(
                 sector_guidelines=sector_guidelines
             )
             
-            response = llm.invoke(prompt)
-            return response.content
+            content = response.content
+            if isinstance(content, list):
+                parts = []
+                for item in content:
+                    if isinstance(item, dict) and "text" in item:
+                        parts.append(str(item["text"]))
+                    elif isinstance(item, str):
+                        parts.append(item)
+                    elif hasattr(item, "text"):
+                        parts.append(str(item.text))
+                return "\n\n".join(parts) if parts else str(content)
+            return str(content)
             
         except Exception as e:
             print(f"Gemini narrative generation failed: {e}. Falling back to offline templates.")

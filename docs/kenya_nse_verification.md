@@ -69,3 +69,26 @@ During verification sweeps, we uploaded live annual reports for major NSE-listed
   - **Banking Profile (Correction)**: Switch the selector to **Banking** to overlay CBK capital adequacy standards. EGH is reassessed in the **Safe Zone**, backed by a Capital Adequacy Ratio of **18.1%** (statutory baseline is 14.5%).
 - **ML Anomaly Outlier Index**: **1.8%** (Classified as a **Standard Signature**). Despite the Z-score metric trap, the unsupervised Isolation Forest correctly recognized that Equity Group behaves stably relative to regional banking peers.
 - **SHAP Drivers**: The minor outlier score was driven by EGH's high government securities portfolio ($27\%$ of assets), which is a common emerging-market bank liquidity strategy but an outlier relative to Western-centric baselines.
+
+### 3. Jubilee Holdings Limited FY 2023 Verification (Insurance Sector)
+- **Model Selected**: Non-Manufacturing / Insurance Prudential Model
+- **Capital & Solvency Compliance**:
+  - Evaluated against the Kenyan **Insurance Regulatory Authority (IRA) Risk-Based Capital (RBC)** framework.
+  - **Solvency Ratio**: Extracted at **165.0%**, substantially above the statutory minimum capital adequacy requirement of **100.0%**.
+- **Balance Sheet Audit**:
+  - **Total Assets**: KES 171,400.00M (KES 171.4bn).
+  - **Total Underwriting Liabilities & Technical Provisions**: KES 122,900.00M (KES 122.9bn).
+  - **Shareholders' Equity & Statutory Contingency Reserves**: KES 48,500.00M (KES 48.5bn).
+  - **Equation Audit**: Assets = Liabilities + Equity passes with 0.00% variance.
+- **ML Anomaly Outlier Index**: **14.2% (Standard Signature)**. Reflects conservative asset allocations in sovereign debt securities and regional investment properties.
+
+---
+
+## Preloaded Panel Demo Files
+
+For instant demonstration to evaluation panels, three audit-ready NSE sample reports are committed directly to the repository under `sample_reports/`:
+- `sample_reports/Equity_Group_Holdings_2023_Financial_Report.pdf` (Commercial Banking)
+- `sample_reports/EABL_2023_Annual_Report.pdf` (Manufacturing & FMCG)
+- `sample_reports/Jubilee_Insurance_2023_Annual_Report.pdf` (Composite Insurance)
+
+These files can be loaded directly from the Streamlit UI with a single click using the **Preloaded Benchmark Reports (NSE Panel Demo)** selector.

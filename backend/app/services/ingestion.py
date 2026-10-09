@@ -135,25 +135,51 @@ def regex_extract_financials(text: str) -> Dict[str, Any]:
     elif re.search(r"in millions|millions of|'000,000|\(millions\)", text, re.IGNORECASE):
         scale = 1000000.0
 
-    # Parsing helper: looks for key terms and pulls nearest numbers on the same line
-    def extract_value_for_keywords(keywords: List[str]) -> float:
+    # Parsing helper: looks for key terms on the same line or immediate next lines (for tables)
+    def parse_clean_num(num_str: str) -> Optional[float]:
+        is_negative = "(" in num_str or "-" in num_str
+        clean_num = re.sub(r"[^\d.]", "", num_str)
+        try:
+            val = float(clean_num)
+            return -val if is_negative else val
+        except ValueError:
+            return None
+
+    def extract_value_for_keywords(keywords: List[str], is_ratio: bool = False) -> float:
         for kw in keywords:
-            # Look for lines containing keyword followed by optional numbers
-            pattern = re.compile(rf".*?{re.escape(kw)}.*?(?:\|\s*)?(-?\(?\$?\s*\d[\d,.]*\)?)", re.IGNORECASE)
-            for line in lines:
-                match = pattern.match(line)
+            kw_regex = re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE)
+            for i, line in enumerate(lines):
+                match = kw_regex.search(line)
                 if match:
-                    num_str = match.group(1)
-                    # Clean number formatting (commas, currency signs)
-                    is_negative = "(" in num_str or "-" in num_str
-                    clean_num = re.sub(r"[^\d.]", "", num_str)
-                    try:
-                        val = float(clean_num)
-                        if is_negative:
-                            val = -val
-                        return val * scale
-                    except ValueError:
-                        continue
+                    if is_ratio:
+                        # For ratios, search on the same line and immediate next 2 lines for percentage
+                        context = line[match.end():]
+                        for offset in [1, 2]:
+                            if i + offset < len(lines):
+                                context += " " + lines[i + offset]
+                        pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", context)
+                        if pct_match:
+                            try:
+                                return float(pct_match.group(1))
+                            except ValueError:
+                                pass
+                    # 1. Try to find number on the same line after the keyword
+                    line_after = line[match.end():].strip()
+                    same_line_matches = re.findall(r"(-?\(?[\$€£]?\s*\d[\d,.]*\)?)", line_after)
+                    if same_line_matches:
+                        for m_str in reversed(same_line_matches):
+                            val = parse_clean_num(m_str)
+                            if val is not None:
+                                return val if is_ratio else (val * scale)
+                                
+                    # 2. Check next 1-2 lines for standalone numbers (common in PyMuPDF table extracts)
+                    for offset in [1, 2]:
+                        if i + offset < len(lines):
+                            next_line = lines[i + offset].strip()
+                            if re.match(r"^-?\(?[\$€£]?\s*\d[\d,.]*\)?%?$", next_line):
+                                val = parse_clean_num(next_line)
+                                if val is not None:
+                                    return val if is_ratio else (val * scale)
         return 0.0
 
     results["revenue"] = extract_value_for_keywords(["total revenue", "revenue", "turnover", "sales", "total sales"])
@@ -161,16 +187,16 @@ def regex_extract_financials(text: str) -> Dict[str, Any]:
     results["net_income"] = extract_value_for_keywords(["net income", "net profit", "profit for the year", "profit (loss) for the year", "net loss"])
     results["assets"] = extract_value_for_keywords(["total assets", "assets"])
     results["liabilities"] = extract_value_for_keywords(["total liabilities", "liabilities"])
-    results["equity"] = extract_value_for_keywords(["total equity", "total shareholders' equity", "stockholders' equity", "equity"])
+    results["equity"] = extract_value_for_keywords(["total shareholders' equity", "total equity", "stockholders' equity", "equity"])
     results["retained_earnings"] = extract_value_for_keywords(["retained earnings", "accumulated deficit", "retained profit"])
     results["working_capital"] = extract_value_for_keywords(["working capital", "net current assets"])
     results["cash"] = extract_value_for_keywords(["cash and cash equivalents", "cash", "cash at bank"])
     results["accounts_receivable"] = extract_value_for_keywords(["accounts receivable", "trade receivables", "receivables"])
     results["inventory"] = extract_value_for_keywords(["inventory", "inventories", "stock"])
     results["interest_expense"] = extract_value_for_keywords(["interest expense", "finance costs", "interest payable"])
-    results["borrowings"] = extract_value_for_keywords(["total borrowings", "borrowings", "interest-bearing borrowings", "total debt", "financial debt"])
-    results["capital_adequacy_ratio"] = extract_value_for_keywords(["capital adequacy ratio", "car ratio", "core capital adequacy"])
-    results["solvency_ratio"] = extract_value_for_keywords(["solvency ratio", "solvency capital requirement ratio", "scr ratio"])
+    results["borrowings"] = extract_value_for_keywords(["total borrowings", "borrowings and debt securities in issue", "borrowings", "interest-bearing borrowings", "total debt", "financial debt"])
+    results["capital_adequacy_ratio"] = extract_value_for_keywords(["total capital adequacy", "capital adequacy", "capital adequacy ratio", "car ratio", "core capital adequacy"], is_ratio=True)
+    results["solvency_ratio"] = extract_value_for_keywords(["solvency ratio", "solvency capital requirement ratio", "scr ratio", "solvency coverage"], is_ratio=True)
     
     # Calculate expenses if missing
     if results["revenue"] > 0 and results["net_income"] != 0 and results["expenses"] == 0:
@@ -256,8 +282,9 @@ def extract_financial_metrics(file_path: str, gemini_api_key: Optional[str] = No
             # Apply scale factor to metrics
             scale = metrics.get("scale", 1.0)
             if scale != 1.0:
-                for key in ["revenue", "expenses", "net_income", "assets", "liabilities", "equity", "retained_earnings", "working_capital", "cash", "accounts_receivable", "inventory", "interest_expense"]:
-                    metrics[key] = metrics[key] * scale
+                for key in ["revenue", "expenses", "net_income", "assets", "liabilities", "equity", "retained_earnings", "working_capital", "cash", "accounts_receivable", "inventory", "interest_expense", "borrowings"]:
+                    if key in metrics and metrics[key] is not None:
+                        metrics[key] = float(metrics[key]) * scale
                 metrics["scale"] = 1.0 # Standardized to 1.0 now
                 
             # Perform verification checks

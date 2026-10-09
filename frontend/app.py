@@ -5,6 +5,12 @@ import streamlit as st
 import plotly.graph_objects as go
 from PIL import Image
 
+# Ensure direct loopback communication by bypassing proxy for local addresses
+os.environ["NO_PROXY"] = "127.0.0.1,localhost," + os.environ.get("NO_PROXY", "")
+os.environ["no_proxy"] = os.environ["NO_PROXY"]
+http_client = requests.Session()
+http_client.trust_env = False
+
 # Config Page Layout
 st.set_page_config(
     page_title="FinLens AI — Risk Intelligence Dashboard",
@@ -91,7 +97,7 @@ st.sidebar.divider()
 
 # System Health Check
 try:
-    health_resp = requests.get(f"{API_URL}/health", timeout=3)
+    health_resp = http_client.get(f"{API_URL}/health", timeout=3)
     if health_resp.status_code == 200:
         health_data = health_resp.json()
         st.sidebar.success("Backend: Connected")
@@ -199,7 +205,7 @@ if file_bytes is not None:
             data = {"sector": active_sector, "gemini_key": user_gemini_key}
             
             # Call FastAPI /analyze
-            response = requests.post(f"{API_URL}/analyze", files=files, data=data)
+            response = http_client.post(f"{API_URL}/analyze", files=files, data=data)
             
             if response.status_code == 200:
                 result = response.json()
@@ -226,7 +232,7 @@ if file_bytes is not None:
                         }
                         files_report = {"file": (file_name, file_bytes, file_type)}
                         
-                        pdf_resp = requests.post(f"{API_URL}/report", files=files_report, data=report_data)
+                        pdf_resp = http_client.post(f"{API_URL}/report", files=files_report, data=report_data)
                         if pdf_resp.status_code == 200:
                             st.download_button(
                                 label="Download Audit-Ready PDF Report",
@@ -482,7 +488,7 @@ col_h1, col_h2 = st.columns([4, 2])
 with col_h1:
     st.write("##### Recent Ingested Documents (Last 10 Runs)")
     try:
-        hist_resp = requests.get(f"{API_URL}/history", timeout=3)
+        hist_resp = http_client.get(f"{API_URL}/history", timeout=3)
         if hist_resp.status_code == 200:
             hist_records = hist_resp.json()
             if hist_records:
@@ -509,7 +515,7 @@ with col_h1:
 with col_h2:
     st.write("##### System Telemetry Metrics")
     try:
-        met_resp = requests.get(f"{API_URL}/metrics", timeout=3)
+        met_resp = http_client.get(f"{API_URL}/metrics", timeout=3)
         if met_resp.status_code == 200:
             met_data = met_resp.json()
             st.markdown(f"""

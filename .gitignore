@@ -19,6 +19,9 @@ Thumbs.db
 backend/data/benchmarks.json
 backend/data/sec_reference_data.csv
 mlflow.db
+*.db-shm
+*.db-wal
+backend/data/*.db*
 backend/models/isolation_forest.pkl
 mlruns/
 backend/data/chroma/

@@ -101,3 +101,36 @@ def test_api_report_generation_with_sample():
     )
     assert response.status_code == 200
     assert response.content.startswith(b"%PDF")
+
+def test_chromadb_regulatory_retrieval():
+    from backend.app.services.narrative import retrieve_regulatory_context
+    banking_ctx = retrieve_regulatory_context("Banking")
+    assert "Basel" in banking_ctx or "Capital Adequacy" in banking_ctx
+    ins_ctx = retrieve_regulatory_context("Insurance")
+    assert "Insurance Regulatory Authority" in ins_ctx or "IRA" in ins_ctx
+
+def test_compile_pdf_report_direct(tmp_path):
+    from backend.app.services.report import compile_pdf_report
+    from backend.app.services.analysis import evaluate_financial_health
+    from backend.app.services.narrative import generate_offline_narrative
+
+    stmt = {
+        "company_name": "Unit Test Co",
+        "assets": 1000000.0,
+        "liabilities": 400000.0,
+        "equity": 600000.0,
+        "revenue": 500000.0,
+        "expenses": 420000.0,
+        "net_income": 80000.0,
+        "working_capital": 200000.0,
+        "retained_earnings": 300000.0,
+        "cash": 100000.0,
+        "borrowings": 50000.0,
+        "sic": "Manufacturing"
+    }
+    analysis = evaluate_financial_health(stmt, identifier="unit_test")
+    narrative = generate_offline_narrative("Unit Test Co", "Manufacturing", analysis["ratios"], analysis["solvency"], analysis["anomaly"])
+    pdf_out = str(tmp_path / "test_report.pdf")
+    compile_pdf_report(pdf_out, "Unit Test Co", "Manufacturing", "FY 2023", "KES", stmt, analysis, narrative)
+    assert os.path.exists(pdf_out)
+    assert os.path.getsize(pdf_out) > 10000

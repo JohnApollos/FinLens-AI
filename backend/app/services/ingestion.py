@@ -277,7 +277,7 @@ def extract_financial_metrics(file_path: str, gemini_api_key: Optional[str] = No
             )
             
             pydantic_res = structured_llm.invoke(prompt)
-            metrics = pydantic_res.dict()
+            metrics = pydantic_res.model_dump() if hasattr(pydantic_res, "model_dump") else pydantic_res.dict()
             
             # Apply scale factor to metrics
             scale = metrics.get("scale", 1.0)

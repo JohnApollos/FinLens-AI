@@ -126,8 +126,30 @@ def retrieve_sector_benchmark(sector: str) -> str:
     sector_info = benchmarks_data.get(matched_sector, benchmarks_data["Fintech"])
     return format_sector_profile(matched_sector, sector_info)
 
-class SimpleMockEmbeddingFunction:
-    def __call__(self, input):
+try:
+    from chromadb import EmbeddingFunction, Documents, Embeddings
+except ImportError:
+    class EmbeddingFunction:
+        pass
+    Documents = list
+    Embeddings = list
+
+class SimpleMockEmbeddingFunction(EmbeddingFunction):
+    def __init__(self, **kwargs):
+        pass
+
+    @staticmethod
+    def name() -> str:
+        return "simple_mock_embedding_function"
+
+    def get_config(self) -> dict:
+        return {}
+
+    @classmethod
+    def build_from_config(cls, config: dict):
+        return cls()
+
+    def __call__(self, input: Documents) -> Embeddings:
         # We construct a simple 6-dimensional one-hot embedding based on sector keywords
         # to ensure semantic querying works correctly without downloading any external model!
         sectors = ["fintech", "insurance", "banking", "manufacturing", "software", "ngo"]

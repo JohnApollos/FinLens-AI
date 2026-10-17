@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime
 from typing import Dict, Any, List
 import re
@@ -313,7 +314,7 @@ def compile_pdf_report(
     # Embed SHAP chart if available
     shap_path = anomaly.get("chart_path", "")
     real_shap_path = shap_path
-    if shap_path and shap_path.startswith("/charts/shap/"):
+    if shap_path and "/charts/shap/" in shap_path:
         file_id = shap_path.split("/")[-1]
         real_shap_path = f"backend/data/temp/shap_waterfall_{file_id}.png"
     if not (real_shap_path and os.path.exists(real_shap_path)):

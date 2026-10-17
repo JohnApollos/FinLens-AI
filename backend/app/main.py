@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import json
@@ -347,10 +348,11 @@ async def generate_report(
                 result["narrative"]
             )
             
+            safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(result.get("company_name", "Company")))
             return FileResponse(
                 pdf_output_path, 
                 media_type="application/pdf", 
-                filename=f"FinLens_Audit_Report_{result['company_name'].replace(' ', '_')}.pdf"
+                filename=f"FinLens_Audit_Report_{safe_name}.pdf"
             )
             
         # Fallback (Cache miss)
@@ -385,10 +387,11 @@ async def generate_report(
             narrative
         )
         
+        safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", str(extracted.get("company_name", "Company")))
         return FileResponse(
             pdf_output_path, 
             media_type="application/pdf", 
-            filename=f"FinLens_Audit_Report_{extracted['company_name'].replace(' ', '_')}.pdf"
+            filename=f"FinLens_Audit_Report_{safe_name}.pdf"
         )
         
     except Exception as e:
@@ -434,11 +437,11 @@ def get_telemetry_metrics():
         }
         
     anomalies = sum(1 for r in history if r.get("is_anomaly"))
-    z_scores = [r.get("z_score", 0.0) for r in history]
+    z_scores = [float(r.get("z_score") or 0.0) for r in history]
     
     distribution = {"Safe": 0, "Grey": 0, "Distress": 0}
     for r in history:
-        zone = r.get("solvency_zone", "")
+        zone = str(r.get("solvency_zone") or "")
         if "safe" in zone.lower():
             distribution["Safe"] += 1
         elif "grey" in zone.lower():
